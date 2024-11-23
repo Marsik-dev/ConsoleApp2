@@ -9,8 +9,6 @@ public class Programm
     public static async Task Main()
     {
         BenchmarkRunner.Run<Ackermann>();
-        //var res = await MyValueTaskSourse.Rent(2, 2).StartOperationAsync();
-        //Console.WriteLine(res);
 
     }
 
@@ -25,7 +23,7 @@ public class Ackermann
     public int n;
     [Params(1, 2, 3)]
     public int m;
-    //[Benchmark(Baseline = true)]
+    [Benchmark(Baseline = true)]
     public int Baseline()
     {
         return AckermannFunc(m, n);
@@ -85,27 +83,22 @@ public class Ackermann
 
         int n, m;
 
-        async Task<int> AckermannFunc(int m, int n)
+        int AckermannFunc(int m, int n) => (m, n) switch
         {
-
-            var _res = (m, n) switch
-            {
-                (0, _) => n + 1,
-                (_, 0) => await AckermannFunc(m - 1, 1),
-                _ => await AckermannFunc(m - 1, await AckermannFunc(m, n - 1)),
-            };
-            if (m == 0)
-            {
-                _result = _res;
-                Complete();
-            }
-            return _result;
-
-        }
+            (0, _) => n + 1,
+            (_, 0) => AckermannFunc(m - 1, 1),
+            _ => AckermannFunc(m - 1, AckermannFunc(m, n - 1))
+        };
 
         public async ValueTask<int> StartOperationAsync()
         {
-            AckermannFunc(n, m);
+            ThreadPool.QueueUserWorkItem((o) =>
+            {
+
+                _result = AckermannFunc(n, m);
+                Complete();
+
+            });
             return await new ValueTask<int>(this, _core.Version);
         }
         public void Complete()
