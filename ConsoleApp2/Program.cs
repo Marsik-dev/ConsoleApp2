@@ -60,69 +60,51 @@ public class Ackermann
     public ValueTask<int> IValueTaskSource()
     {
 
-        return MyValueTaskSourse.Rent(n, m).StartOperationAsync();
+        return new AckermannFunction().Func(m, n);
         
     }
 
-    public class MyValueTaskSourse : IValueTaskSource<int>, IDisposable
+public class AckermannFunction : IValueTaskSource<int>
+{
+    private int _result;
+    private ValueTaskSourceStatus _status;
+    private ManualResetValueTaskSourceCore<int> _core;
+
+    public ValueTask<int> Func(int m, int n)
     {
+        _status = ValueTaskSourceStatus.Pending;
+        _core.Reset();
 
-        private static readonly ObjectPool<MyValueTaskSourse> _pool = new DefaultObjectPool<MyValueTaskSourse>(new DefaultPooledObjectPolicy<MyValueTaskSourse>());
-        private ManualResetValueTaskSourceCore<int> _core;
+        _result = ComputeAckermann(m, n);
+        _status = ValueTaskSourceStatus.Succeeded;
 
-        private int _result;
-
-        public static MyValueTaskSourse Rent(int n, int m)
-        {
-            var objPool = _pool.Get();
-            objPool.m = m;
-            objPool.n = n;
-            objPool._core.Reset(); // Сбрасываем состояние перед повторным использованием
-            return objPool;
-        }
-
-        int n, m;
-
-        int AckermannFunc(int m, int n) => (m, n) switch
-        {
-            (0, _) => n + 1,
-            (_, 0) => AckermannFunc(m - 1, 1),
-            _ => AckermannFunc(m - 1, AckermannFunc(m, n - 1))
-        };
-
-        public async ValueTask<int> StartOperationAsync()
-        {
-            ThreadPool.QueueUserWorkItem((o) =>
-            {
-
-                _result = AckermannFunc(n, m);
-                Complete();
-
-            });
-            return await new ValueTask<int>(this, _core.Version);
-        }
-        public void Complete()
-        {
-            _core.SetResult(_result); // Завершаем операцию и устанавливаем результат
-        }
-        public int GetResult(short token)
-        {
-            return _core.GetResult(token); // Получаем результат операции
-        }
-        public ValueTaskSourceStatus GetStatus(short token)
-        {
-            return _core.GetStatus(token); // Получаем статус операции
-        }
-        public void OnCompleted(Action<object> continuation, object state, short token, ValueTaskSourceOnCompletedFlags flags)
-        {
-            _core.OnCompleted(continuation, state, token, flags); // Регистрируем продолжение
-        }
-        public void Dispose()
-        {
-            // Возвращаем объект в пул после завершения
-            _pool.Return(this);
-        }
-
+        return new ValueTask<int>(this, _core.Version);
     }
 
+    private int ComputeAckermann(int m, int n)
+    {
+        // Реализация функции Аккермана
+        if (m == 0)
+        {
+            return n + 1;
+        }
+        else if (m > 0 && n == 0)
+        {
+            return ComputeAckermann(m - 1, 1);
+        }
+        else
+        {
+            return ComputeAckermann(m - 1, ComputeAckermann(m, n - 1));
+        }
+    }
+
+    public int GetResult(short token) => _result;
+
+    public ValueTaskSourceStatus GetStatus(short token) => _status;
+
+    public void OnCompleted(Action<object> continuation, object state, short token, ValueTaskSourceOnCompletedFlags flags)
+    {
+        _core.OnCompleted(continuation, state, token, flags);
+    }
+}
 }
